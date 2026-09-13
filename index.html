@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blink Paywall Generator</title>
+
+    <meta name="description" content="Create a Bitcoin Lightning paywall for your website. Paste one snippet and unlock content, downloads, links or any action when a visitor pays your Blink account.">
+    <meta name="author" content="Blink">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://blinkbitcoin.github.io/blink-paywall/">
+    <meta property="og:title" content="Blink Paywall Generator — unlock anything with Lightning">
+    <meta property="og:description" content="Create a Bitcoin Lightning paywall for your website. No backend needed.">
+    <meta property="twitter:site" content="@blinkbtc">
+    <meta name="theme-color" content="#fc5805">
+    <link rel="canonical" href="https://blinkbitcoin.github.io/blink-paywall/">
+    <link rel="icon" type="image/svg+xml" href="img/blink-light.svg">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Blink design tokens (shared with donation-button.blink.sv) */
+        :root {
+            --primary: #fc5805;
+            --primary-pressed: #fd800b;
+            --text-primary: #3A3C51;
+            --text-muted: #9292A0;
+            --border: #E2E2E4;
+            --surface-static: #F9F9F9;
+            --surface-page: #FFFFFF;
+            --color-error: #DC2626;
+            --color-success: #00A700;
+            --radius-sm: 8px;
+            --radius-lg: 16px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+            color: var(--text-primary);
+            background: var(--surface-page);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .container { max-width: 1060px; margin: 0 auto; padding: 24px 16px 80px; }
+
+        header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        header img { height: 34px; }
+        header h1 { font-size: 26px; margin: 0; }
+        .tagline { color: var(--text-muted); margin: 0 0 32px; }
+
+        .layout { display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start; }
+        @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+        .step { margin-bottom: 28px; }
+        .step h2 { font-size: 17px; margin: 0 0 10px; }
+        .step h2 .n {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 999px;
+            background: var(--primary); color: #fff; font-size: 13px; margin-right: 8px;
+        }
+
+        label { display: block; font-size: 14px; font-weight: 500; margin: 12px 0 4px; }
+        .hint { font-size: 13px; color: var(--text-muted); margin: 4px 0 0; }
+        .error { font-size: 14px; color: var(--color-error); margin: 6px 0 0; }
+        .success { font-size: 14px; color: var(--color-success); margin: 6px 0 0; }
+
+        input[type="text"], input[type="number"], input[type="url"], textarea, select {
+            width: 100%; padding: 10px 12px; font: inherit; font-size: 15px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text-primary); background: #fff;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary);
+        }
+        textarea { min-height: 96px; resize: vertical; }
+
+        .row { display: flex; gap: 10px; }
+        .row > * { flex: 1; }
+        .row .narrow { flex: 0 0 130px; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+        .type-card {
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 12px; cursor: pointer; background: var(--surface-static);
+            font-size: 14px; text-align: left;
+        }
+        .type-card input { position: absolute; opacity: 0; }
+        .type-card.selected { border-color: var(--primary); outline: 2px solid var(--primary); outline-offset: -2px; background: #fff; }
+        .type-card b { display: block; margin-bottom: 2px; }
+        .type-card span { color: var(--text-muted); font-size: 12.5px; }
+
+        .btn {
+            display: inline-block; padding: 10px 20px; font: inherit; font-weight: 600;
+            border: none; border-radius: 999px; cursor: pointer;
+            background: var(--primary); color: #fff;
+        }
+        .btn:hover { background: var(--primary-pressed); }
+        .btn.secondary { background: var(--surface-static); color: var(--text-primary); border: 1px solid var(--border); }
+
+        details { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; }
+        details summary { cursor: pointer; font-weight: 500; font-size: 14px; }
+
+        .preview-pane { position: sticky; top: 16px; }
+        .preview-box {
+            border: 1px dashed var(--border); border-radius: var(--radius-lg);
+            padding: 20px 14px; background: var(--surface-static); margin-bottom: 8px;
+        }
+        .preview-actions { text-align: right; margin-bottom: 20px; }
+        .preview-actions button { font-size: 13px; background: none; border: none; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
+
+        pre {
+            background: #24252d; color: #e8e8ec; border-radius: var(--radius-sm);
+            padding: 14px; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap;
+            word-break: break-all; margin: 0 0 10px;
+        }
+        .copy-wrap { position: relative; }
+
+        footer { margin-top: 60px; font-size: 13px; color: var(--text-muted); }
+        footer a { color: var(--primary); }
+        #hard-mode-note { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="img/blink-light.svg" alt="Blink">
+            <h1>Paywall Generator</h1>
+        </header>
+        <p class="tagline">Unlock anything with a Lightning payment — content, downloads, links, embeds. One snippet, no backend, money goes straight to your Blink wallet.</p>
+
+        <div class="layout">
+            <main>
+                <div class="step">
+                    <h2><span class="n">1</span>Your Blink username</h2>
+                    <div class="row">
+                        <input type="text" id="username" placeholder="satoshi" autocomplete="off" spellcheck="false">
+                        <button class="btn narrow" id="check-username" type="button">Check</button>
+                    </div>
+                    <p class="hint">Payments go directly to this account. No Blink yet? <a href="https://get.blink.sv?referral=blink_paywall" target="_blank" rel="noopener">Download Blink</a> and pick a username.</p>
+                    <p id="username-status"></p>
+                </div>
+
+                <div class="step">
+                    <h2><span class="n">2</span>What does a payment unlock?</h2>
+                    <div class="cards" id="unlock-types">
+                        <label class="type-card selected"><input type="radio" name="unlock-type" value="content" checked>
+                            <b>Content on this page</b><span>article, image, audio — any HTML</span></label>
+                        <label class="type-card"><input type="radio" name="unlock-type" value="secret">
+                            <b>A secret text</b><span>license key, coupon, password</span></label>
+                        <label class="type-card"><input type="radio" name="unlock-type" value="embed">
+                            <b>A video / embed</b><span>YouTube, PDF, any iframe</span></label>
+                        <label class="type-card"><input type="radio" name="unlock-type" value="redirect">
+                            <b>A link</b><span>download, thank-you page, booking</span></label>
+                        <label class="type-card"><input type="radio" name="unlock-type" value="l402">
+                            <b>My own server (hard paywall)</b><span>L402 — content stays server-side</span></label>
+                    </div>
+
+                    <div id="field-content">
+                        <label for="content-html">Locked content (HTML or plain text)</label>
+                        <textarea id="content-html" placeholder="&lt;p&gt;The rest of the article...&lt;/p&gt;"></textarea>
+                        <p class="hint">Stays inside an inert <code>&lt;template&gt;</code> — it doesn't render or load before payment.</p>
+                    </div>
+                    <div id="field-secret" hidden>
+                        <label for="secret-text">Secret to reveal</label>
+                        <input type="text" id="secret-text" placeholder="COUPON-2024 or a password">
+                    </div>
+                    <div id="field-embed" hidden>
+                        <label for="embed-url">Embed URL</label>
+                        <input type="url" id="embed-url" placeholder="https://www.youtube-nocookie.com/embed/VIDEO_ID">
+                        <p class="hint">For YouTube use the <i>Share → Embed</i> URL. The iframe only loads after payment.</p>
+                    </div>
+                    <div id="field-redirect" hidden>
+                        <label for="redirect-url">Send the visitor to</label>
+                        <input type="url" id="redirect-url" placeholder="https://example.com/download">
+                    </div>
+                    <div id="field-l402" hidden>
+                        <label for="l402-url">Your L402 endpoint</label>
+                        <input type="url" id="l402-url" placeholder="https://your-server.com/content/ebook">
+                        <p class="hint">Your server mints the invoice and verifies the payment — content never reaches the browser unpaid. <a href="https://github.com/blinkbitcoin/blink-paywall/tree/main/examples/l402-server" target="_blank" rel="noopener">Zero-dependency reference server</a> (price is set there, not here).</p>
+                    </div>
+                </div>
+
+                <div class="step" id="price-step">
+                    <h2><span class="n">3</span>Price</h2>
+                    <div class="row">
+                        <input type="number" id="amount" value="1000" min="0" step="any">
+                        <select id="currency" class="narrow">
+                            <option value="sats" selected>sats</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="CHF">CHF</option>
+                            <option value="MXN">MXN</option>
+                            <option value="NGN">NGN</option>
+                            <option value="ZAR">ZAR</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h2><span class="n">4</span>Look &amp; behavior</h2>
+                    <label for="title">Title on the card</label>
+                    <input type="text" id="title" placeholder="Unlock the full article" value="Unlock the full article">
+                    <label for="description">Description (optional)</label>
+                    <input type="text" id="description" placeholder="One-time payment. No account needed.">
+                    <div class="row">
+                        <div>
+                            <label for="remember">Remember the unlock</label>
+                            <select id="remember">
+                                <option value="forever" selected>Forever (this device)</option>
+                                <option value="30d">30 days</option>
+                                <option value="7d">7 days</option>
+                                <option value="24h">24 hours</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="theme">Theme</label>
+                            <select id="theme">
+                                <option value="light" selected>Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <details>
+                        <summary>Advanced</summary>
+                        <label for="item-id">Item id <span class="hint" style="display:inline">(unlocks are remembered per id)</span></label>
+                        <input type="text" id="item-id" placeholder="auto">
+                        <label for="unlock-class">Add a CSS class to &lt;html&gt; when unlocked</label>
+                        <input type="text" id="unlock-class" placeholder="supporter">
+                        <label for="webhook">Webhook — POST the receipt to a URL (Zapier, Make, n8n)</label>
+                        <input type="url" id="webhook" placeholder="https://hooks.zapier.com/hooks/catch/...">
+                        <p class="hint">The webhook fires from the visitor's browser — treat it as a notification, not as proof of payment.</p>
+                    </details>
+                </div>
+            </main>
+
+            <aside class="preview-pane">
+                <h2 style="font-size:17px; margin:0 0 10px">Live preview</h2>
+                <div class="preview-box"><div id="preview"></div></div>
+                <div class="preview-actions"><button type="button" id="reset-preview">Reset preview unlocks</button></div>
+
+                <h2 style="font-size:17px; margin:0 0 10px">Your snippet</h2>
+                <div class="copy-wrap"><pre><code id="code"></code></pre></div>
+                <button class="btn" id="copy" type="button" style="width:100%">Copy code</button>
+                <p class="hint" id="hard-mode-note">Hard mode: also set up the <a href="https://github.com/blinkbitcoin/blink-paywall/tree/main/examples/l402-server" target="_blank" rel="noopener">server side</a>.</p>
+            </aside>
+        </div>
+
+        <footer>
+            <p>Soft paywalls run entirely in the visitor's browser — great for tips, articles and honest audiences, but a determined visitor can bypass them with browser dev tools. For content that must stay protected, use <b>My own server (L402)</b>. <a href="https://github.com/blinkbitcoin/blink-paywall#security-model" target="_blank" rel="noopener">Security model</a></p>
+            <p>Open source (AGPL-3.0) — <a href="https://github.com/blinkbitcoin/blink-paywall" target="_blank" rel="noopener">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script src="v1/blink-paywall.js"></script>
+    <script src="generator.js"></script>
+</body>
+</html>

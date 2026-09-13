@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blink Paywall — soft mode examples</title>
+    <style>
+        body { font-family: sans-serif; max-width: 680px; margin: 40px auto; padding: 0 16px; }
+        section { margin-bottom: 56px; }
+        .premium-extra { display: none; }
+        html.supporter .premium-extra { display: block; }
+    </style>
+</head>
+<body>
+    <h1>Blink Paywall — soft mode</h1>
+    <p>
+        Replace <code>data-username</code> with your Blink username. Everything below is
+        backendless: invoices are created straight from the visitor's browser.
+        (Loads the local build — run <code>npm run build</code> first, then serve the
+        repo root, e.g. <code>npx serve</code>.)
+    </p>
+
+    <script defer src="../v1/blink-paywall.js"></script>
+
+    <section>
+        <h2>1. Reveal hidden content</h2>
+        <p>The intro is free. The rest of the article sits in an inert
+           <code>&lt;template&gt;</code> until paid.</p>
+        <div data-blink-paywall
+             data-username="alice"
+             data-amount="210" data-currency="sats"
+             data-id="article-1"
+             data-title="Read the full article"
+             data-description="One-time payment. Unlocked forever on this device."
+             data-remember="forever">
+            <template>
+                <h3>The full article</h3>
+                <p>...continues here, iframes and images in a template do not even
+                   load before the unlock.</p>
+                <iframe width="560" height="315" data-note="only loads after unlock"
+                        src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"></iframe>
+            </template>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Redirect after payment</h2>
+        <div data-blink-paywall
+             data-username="alice"
+             data-amount="0.50" data-currency="USD"
+             data-id="download-1"
+             data-title="Download the PDF"
+             data-redirect="https://example.com/thanks"></div>
+    </section>
+
+    <section>
+        <h2>3. CSS-only unlock + webhook + JS hooks</h2>
+        <div class="premium-extra">This box is shown purely by CSS once
+            <code>html.supporter</code> is set.</div>
+        <div id="supporter-wall" data-blink-paywall
+             data-username="alice"
+             data-amount="1000" data-currency="sats"
+             data-id="supporter"
+             data-title="Become a supporter"
+             data-unlock-class="supporter"
+             data-webhook="https://hooks.zapier.com/hooks/catch/XXXX/YYYY/"
+             data-remember="30d"></div>
+        <script>
+            document.addEventListener('blink:unlocked', (event) => {
+                console.log('unlocked!', event.detail.receipt);
+            });
+        </script>
+    </section>
+</body>
+</html>

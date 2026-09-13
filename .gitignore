@@ -1,0 +1,6 @@
+node_modules/
+# build output — published to GitHub Pages as /v1/blink-paywall.js, built by CI
+/v1/
+coverage/
+*.log
+.DS_Store
