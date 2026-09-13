@@ -32,10 +32,11 @@ jobs:
       # published alongside the site. They are not needed past this point.
       - name: Prune dev dependencies
         run: rm -rf node_modules
+      # Pages itself is enabled out of band (org policy blocks the workflow
+      # token from creating the site):
+      #   gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        with:
-          enablement: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
