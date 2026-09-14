@@ -36,6 +36,17 @@
     --border: #374151;
 }
 
+/* data-theme="auto" (the default): follow the visitor's own light/dark
+   preference. Pure CSS, so it also re-themes live when they flip it. */
+@media (prefers-color-scheme: dark) {
+    .card.auto {
+        --bg: #1d1d1d;
+        --fg: #f5f5f5;
+        --muted: #9ca3af;
+        --border: #374151;
+    }
+}
+
 .icon {
     width: 40px;
     height: 40px;

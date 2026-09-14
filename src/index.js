@@ -34,7 +34,8 @@ function configFrom(el, overrides = {}) {
         title: d.title,
         description: d.description,
         remember: d.remember,
-        theme: d.theme,
+        // 'auto' follows the visitor's light/dark preference; 'light'/'dark' pin it.
+        theme: d.theme || 'auto',
         redirect: d.redirect,
         webhook: d.webhook,
         unlockClass: d.unlockClass,

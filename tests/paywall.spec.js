@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpiredError } from '../src/blink.js';
 import { createPaywall } from '../src/paywall.js';
@@ -65,6 +68,46 @@ describe('price formatting', () => {
         expect(formatPrice(2.5, 'EUR')).toMatch(/2[.,]50/);
         expect(formatPrice(300, 'JPY')).toMatch(/300/); // 0-decimal currency
         expect(formatPrice(5, 'NOTACURRENCY')).toBe('5 NOTACURRENCY');
+    });
+});
+
+describe('theme', () => {
+    // 'auto' resolves in CSS via prefers-color-scheme, so the class is the
+    // contract: .card.auto must carry the media query, .card.dark must not.
+    const cardClass = async (theme) => {
+        instance = createPaywall(el, { ...CONFIG, theme }, fakeSource(), createView);
+        await flush();
+        return shadow().querySelector('.card').className;
+    };
+
+    it('defaults to auto when unspecified', async () => {
+        expect(await cardClass(undefined)).toBe('card auto');
+    });
+
+    it('pins light and dark when asked', async () => {
+        expect(await cardClass('light')).toBe('card');
+        instance.destroy();
+        instance = null;
+        el.innerHTML = '<template><p class="premium">secret content</p></template>';
+        expect(await cardClass('dark')).toBe('card dark');
+    });
+
+    it('treats an unknown value as auto rather than breaking the card', async () => {
+        expect(await cardClass('chartreuse')).toBe('card auto');
+    });
+
+    // The class is only half the contract. prefers-color-scheme cannot be
+    // emulated here, and Vite hands CSS imports to the test as an empty string,
+    // so read the stylesheet itself to prove the rule that resolves `auto` ships.
+    it('ships the prefers-color-scheme rule that makes auto work', () => {
+        const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles.css');
+        const css = readFileSync(cssPath, 'utf8');
+        const darkMedia = css.match(
+            /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*\.card\.auto\s*\{([^}]*)\}/
+        );
+        expect(darkMedia).not.toBeNull();
+        expect(darkMedia[1]).toContain('--bg');
+        expect(darkMedia[1]).toContain('--fg');
     });
 });
 
