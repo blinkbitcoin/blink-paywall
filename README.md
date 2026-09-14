@@ -59,7 +59,7 @@ BlinkPaywall.actions.confetti = ({ el, config, receipt, response }) => {
 | `data-id` | page path | unlocks are remembered per `username`+`id` |
 | `data-title`, `data-description` | — | card text |
 | `data-remember` | `forever` | `24h`, `7d`, `30d`, ... (`Nm/Nh/Nd`) — how long the unlock lasts on the device |
-| `data-theme` | `light` | `dark` |
+| `data-theme` | `auto` | `auto` follows the visitor's own light/dark preference; `light` or `dark` pins it |
 | `data-redirect`, `data-webhook`, `data-unlock-class` | — | actions, see above |
 
 JS API (for SPAs / custom flows): `BlinkPaywall.scan()`,

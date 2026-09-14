@@ -73,7 +73,9 @@ export function createView(container, config, handlers) {
     style.textContent = css;
     root.appendChild(style);
 
-    const card = el('div', `card ${config.theme === 'dark' ? 'dark' : ''}`.trim());
+    // 'auto' (default) follows prefers-color-scheme in CSS; 'light'/'dark' pin it.
+    const themeClass = { dark: 'dark', light: '' }[config.theme] ?? 'auto';
+    const card = el('div', `card ${themeClass}`.trim());
     const body = el('div', 'body');
     card.appendChild(body);
 

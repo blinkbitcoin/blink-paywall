@@ -140,7 +140,7 @@
         { key: 'title', id: 'title', def: 'Unlock the full article' },
         { key: 'description', id: 'description', def: '' },
         { key: 'remember', id: 'remember', def: 'forever' },
-        { key: 'theme', id: 'theme', def: 'light' },
+        { key: 'theme', id: 'theme', def: 'auto' },
         { key: 'id', id: 'item-id', def: '' },
         { key: 'unlockClass', id: 'unlock-class', def: '' },
         { key: 'webhook', id: 'webhook', def: '' },
@@ -237,7 +237,7 @@
         if (config.title) attributes.push(['data-title', config.title]);
         if (config.description) attributes.push(['data-description', config.description]);
         if (config.remember !== 'forever') attributes.push(['data-remember', config.remember]);
-        if (config.theme !== 'light') attributes.push(['data-theme', config.theme]);
+        if (config.theme !== 'auto') attributes.push(['data-theme', config.theme]);
         if (config.type === 'redirect' && config.redirectUrl) {
             attributes.push(['data-redirect', config.redirectUrl]);
         }
