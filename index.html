@@ -43,14 +43,25 @@
             line-height: 1.5;
         }
 
-        .container { max-width: 1060px; margin: 0 auto; padding: 24px 16px 80px; }
+        /* Use the screen we are given. The form column stays at a readable
+           measure (see .layout) — the extra width goes to the preview and the
+           snippet, which are the things that actually benefit from it. */
+        .container { max-width: min(1560px, 95vw); margin: 0 auto; padding: 24px 16px 80px; }
 
         header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
         header img { height: 34px; }
         header h1 { font-size: 26px; margin: 0; }
         .tagline { color: var(--text-muted); margin: 0 0 32px; }
 
-        .layout { display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start; }
+        /* Form capped at a readable measure — stretching a Title input across
+           900px is worse, not better. The leftover width goes to the right rail,
+           so the preview and the snippet get the room they actually use. */
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 720px) minmax(380px, 1fr);
+            gap: 40px;
+            align-items: start;
+        }
         @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
 
         .step { margin-bottom: 28px; }
@@ -113,7 +124,9 @@
         pre {
             background: #24252d; color: #e8e8ec; border-radius: var(--radius-sm);
             padding: 14px; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap;
-            word-break: break-all; margin: 0 0 10px;
+            /* anywhere, not break-all: break only when a line truly cannot fit,
+               instead of chopping the script URL mid-token on every line. */
+            overflow-wrap: anywhere; margin: 0 0 10px;
         }
         .copy-wrap { position: relative; }
 
