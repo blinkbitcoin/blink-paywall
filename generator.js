@@ -122,6 +122,83 @@
         return document.querySelector('input[name="unlock-type"]:checked').value;
     }
 
+    // ── URL state ──
+    //
+    // The whole form lives in the hash fragment, so a bookmarked link restores
+    // the setup (and can be shared). The fragment — not a query string — keeps
+    // it out of server logs and Referer headers: one unlock type is a secret
+    // (licence key, coupon, password).
+    //
+    // Each entry maps a URL key to the field it round-trips and the default
+    // that keeps it OUT of the URL, so a simple setup stays short.
+
+    var URL_FIELDS = [
+        { key: 'type', id: null, def: 'content' }, // radio group, handled below
+        { key: 'username', id: 'username', def: '' },
+        { key: 'amount', id: 'amount', def: '1000' },
+        { key: 'currency', id: 'currency', def: 'sats' },
+        { key: 'title', id: 'title', def: 'Unlock the full article' },
+        { key: 'description', id: 'description', def: '' },
+        { key: 'remember', id: 'remember', def: 'forever' },
+        { key: 'theme', id: 'theme', def: 'light' },
+        { key: 'id', id: 'item-id', def: '' },
+        { key: 'unlockClass', id: 'unlock-class', def: '' },
+        { key: 'webhook', id: 'webhook', def: '' },
+        { key: 'content', id: 'content-html', def: '' },
+        { key: 'secret', id: 'secret-text', def: '' },
+        { key: 'embed', id: 'embed-url', def: '' },
+        { key: 'redirect', id: 'redirect-url', def: '' },
+        { key: 'l402', id: 'l402-url', def: '' },
+    ];
+
+    var UNLOCK_TYPES = ['content', 'secret', 'embed', 'redirect', 'l402'];
+
+    // Long locked content makes long links. Browsers cope; chat and mail clients
+    // truncate. Warn rather than silently hand over a broken link.
+    var URL_LENGTH_WARN = 2000;
+
+    function buildHash() {
+        var params = new URLSearchParams();
+        URL_FIELDS.forEach(function (field) {
+            var value = field.id ? $(field.id).value : unlockType();
+            if (value !== field.def) params.set(field.key, value);
+        });
+        return params.toString();
+    }
+
+    function applyHash(hash) {
+        var params = new URLSearchParams(String(hash || '').replace(/^#/, ''));
+        if (!Array.from(params.keys()).length) return false;
+
+        URL_FIELDS.forEach(function (field) {
+            if (!params.has(field.key)) return;
+            var value = params.get(field.key);
+            if (field.id) {
+                $(field.id).value = value;
+                return;
+            }
+            // Unlock type: only accept a known value, else leave the default.
+            if (UNLOCK_TYPES.indexOf(value) === -1) return;
+            var radio = document.querySelector('input[name="unlock-type"][value="' + value + '"]');
+            if (radio) radio.checked = true;
+        });
+        return true;
+    }
+
+    function syncHash() {
+        var hash = buildHash();
+        var url = window.location.pathname + window.location.search + (hash ? '#' + hash : '');
+        try {
+            // replaceState, not pushState: typing must not fill the back button.
+            window.history.replaceState(null, '', url);
+        } catch {
+            // Some sandboxed contexts (file://, srcdoc iframes) reject this.
+            return;
+        }
+        var tooLong = window.location.href.length > URL_LENGTH_WARN;
+        $('link-warning').hidden = !tooLong;
+    }
+
     function readForm() {
         var type = unlockType();
         return {
@@ -250,9 +327,13 @@
         };
     }
 
+    var hashTimer = null;
+
     function update() {
         var config = readForm();
         $('code').textContent = buildSnippet(config);
+        clearTimeout(hashTimer);
+        hashTimer = setTimeout(syncHash, 300);
         $('price-step').style.display = config.type === 'l402' ? 'none' : '';
         $('hard-mode-note').style.display = config.type === 'l402' ? 'block' : 'none';
         ['content', 'secret', 'embed', 'redirect', 'l402'].forEach(function (name) {
@@ -286,6 +367,16 @@
         });
     });
 
+    $('copy-link').addEventListener('click', function () {
+        syncHash(); // flush any pending debounce so the link is current
+        navigator.clipboard.writeText(window.location.href).then(function () {
+            $('copy-link').textContent = '\u2713 Link copied';
+            setTimeout(function () {
+                $('copy-link').textContent = 'Copy link to this setup';
+            }, 1500);
+        });
+    });
+
     $('reset-preview').addEventListener('click', function () {
         Object.keys(localStorage)
             .filter(function (key) {
@@ -297,5 +388,9 @@
         update();
     });
 
+    // Restore a saved setup before the first render. A username in the link is
+    // validated as if it had been typed, so the preview mounts ready to pay.
+    var restored = applyHash(window.location.hash);
     update();
+    if (restored && $('username').value) checkUsername();
 })();
