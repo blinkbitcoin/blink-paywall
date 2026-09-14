@@ -115,6 +115,25 @@ describe('pay flow', () => {
         expect(eventSpy.mock.calls[0][0].detail.receipt.preimage).toBe('pre1');
     });
 
+    it('a fiat price also shows the invoice\u2019s exact sat amount', async () => {
+        const source = fakeSource({
+            challenge: vi.fn(async () => ({ ...CHALLENGE, sats: 1310 })),
+        });
+        instance = createPaywall(el, { ...CONFIG, amount: 1, currency: 'USD' }, source, createView);
+        await flush();
+        shadow().querySelector('.btn.primary').click();
+        await flush();
+        expect(shadow().textContent).toContain('Pay $1.00 (1310 sats) to unlock');
+    });
+
+    it('a sats price shows sats only', async () => {
+        instance = createPaywall(el, CONFIG, fakeSource(), createView);
+        await flush();
+        shadow().querySelector('.btn.primary').click();
+        await flush();
+        expect(shadow().textContent).toContain('Pay 2100 sats to unlock');
+    });
+
     it('shows the invoice QR and countdown while pending', async () => {
         instance = createPaywall(el, CONFIG, fakeSource(), createView);
         await flush();

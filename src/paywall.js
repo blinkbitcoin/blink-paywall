@@ -32,11 +32,16 @@ export function createPaywall(el, config, source, createViewFn) {
 
     const priceLabel = config.amount ? formatPrice(config.amount, config.currency) : null;
 
+    /**
+     * What the payer is asked for on the invoice screen. A fiat price also
+     * shows the invoice's exact sat amount, since that is what their wallet
+     * will prompt for.
+     */
     function labelFor(challenge) {
-        return (
-            priceLabel ||
-            (challenge && challenge.sats ? formatPrice(challenge.sats, 'sats') : 'with Lightning')
-        );
+        const sats = challenge && challenge.sats;
+        if (!priceLabel) return sats ? formatPrice(sats, 'sats') : 'with Lightning';
+        if (config.currency === 'sats' || !sats) return priceLabel;
+        return `${priceLabel} (${formatPrice(sats, 'sats')})`;
     }
 
     function buildReceipt(challenge, preimage) {

@@ -90,37 +90,28 @@ function getWallet() {
     return walletPromise;
 }
 
-/** Create an invoice for `sats` into the owner's wallet (BTC or USD). */
+/**
+ * Create an invoice for exactly `sats` into the owner's wallet. A USD wallet
+ * gets the sat-denominated variant — invoicing it in cents would round to a
+ * whole cent and add the dealer spread, so the payer would be quoted more than
+ * the advertised price. Blink credits the USD wallet either way.
+ */
 async function createInvoice(sats, memo) {
     const wallet = await getWallet();
-    let name, inputType, amount;
-    if (wallet.currency === 'BTC') {
-        name = 'lnInvoiceCreateOnBehalfOfRecipient';
-        inputType = 'LnInvoiceCreateOnBehalfOfRecipientInput';
-        amount = sats;
-    } else {
-        // USD wallet invoices take cents: convert at the realtime rate.
-        const price = await gql(
-            `query RealtimePrice($currency: DisplayCurrency!) {
-                realtimePrice(currency: $currency) { btcSatPrice { base offset } }
-            }`,
-            { currency: 'USD' }
-        );
-        const satPriceCents =
-            price.realtimePrice.btcSatPrice.base /
-            Math.pow(10, price.realtimePrice.btcSatPrice.offset);
-        name = 'lnUsdInvoiceCreateOnBehalfOfRecipient';
-        inputType = 'LnUsdInvoiceCreateOnBehalfOfRecipientInput';
-        amount = Math.max(1, Math.round(sats * satPriceCents));
-    }
+    const name =
+        wallet.currency === 'BTC'
+            ? 'lnInvoiceCreateOnBehalfOfRecipient'
+            : 'lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient';
+    // USD invoices carry an exchange rate, so Blink caps them at 5 minutes.
+    const expiresIn = wallet.currency === 'BTC' ? '15' : '5';
     const data = await gql(
-        `mutation CreateInvoice($input: ${inputType}!) {
+        `mutation CreateInvoice($input: ${name[0].toUpperCase()}${name.slice(1)}Input!) {
             ${name}(input: $input) {
                 invoice { paymentRequest paymentHash }
                 errors { message }
             }
         }`,
-        { input: { recipientWalletId: wallet.id, amount: String(amount), memo, expiresIn: '15' } }
+        { input: { recipientWalletId: wallet.id, amount: String(sats), memo, expiresIn } }
     );
     const payload = data[name];
     if (payload.errors && payload.errors.length) throw new Error(payload.errors[0].message);

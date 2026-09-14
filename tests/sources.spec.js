@@ -52,6 +52,56 @@ describe('createBlinkSource', () => {
         expect(challenge.verifyUrl).toBeUndefined();
     });
 
+    // Regression: a sats price into a USD wallet used to be converted to cents,
+    // which rounded and then added the dealer spread (1000 sats -> ~1007).
+    it('USD-wallet recipient with a sats price: exact sats, no rate lookup', async () => {
+        const fetchMock = vi.fn(async (url, options) => {
+            const body = JSON.parse(options.body);
+            if (body.query.includes('accountDefaultWallet')) {
+                return gqlResponse({ accountDefaultWallet: { id: 'w2', currency: 'USD' } });
+            }
+            expect(body.query).toContain('lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient');
+            expect(body.variables.input.amount).toBe('2100');
+            return gqlResponse({
+                lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient: {
+                    invoice: { paymentRequest: 'lnbc21u1usd', paymentHash: 'h', satoshis: 2100 },
+                    errors: [],
+                },
+            });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        const challenge = await createBlinkSource(config).challenge();
+        expect(challenge.sats).toBe(2100);
+        expect(
+            fetchMock.mock.calls.some((call) =>
+                JSON.parse(call[1].body).query.includes('realtimePrice')
+            )
+        ).toBe(false);
+    });
+
+    it('memo: prefixes with "Unlock: " unless the title already says it', async () => {
+        const memos = [];
+        const fetchMock = vi.fn(async (url, options) => {
+            const body = JSON.parse(options.body);
+            if (body.query.includes('accountDefaultWallet')) {
+                return gqlResponse({ accountDefaultWallet: { id: 'w1', currency: 'BTC' } });
+            }
+            memos.push(body.variables.input.memo);
+            return gqlResponse({
+                lnInvoiceCreateOnBehalfOfRecipient: {
+                    invoice: { paymentRequest: 'lnbc1', paymentHash: 'h', satoshis: 1 },
+                    errors: [],
+                },
+            });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await createBlinkSource({ ...config, title: 'The full article' }).challenge();
+        await createBlinkSource({ ...config, title: 'Unlock the full article' }).challenge();
+        expect(memos).toEqual(['Unlock: The full article', 'Unlock the full article']);
+    });
+
     it('self-custodial fallback: LNURL invoice with verify URL', async () => {
         const fetchMock = vi.fn(async (url) => {
             const urlString = String(url);

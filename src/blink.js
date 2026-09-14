@@ -75,42 +75,58 @@ export async function getRate(currency) {
 }
 
 /**
- * Convert a price (amount + currency, where currency is 'sats' or a display
- * currency code) into the integer unit the recipient's wallet invoices in:
- * sats for BTC wallets, US cents for USD wallets.
+ * Turn a price (amount + currency, where currency is 'sats' or a display
+ * currency code) into the integer amount and the unit the invoice should be
+ * denominated in.
+ *
+ * A sats price is ALWAYS invoiced in sats, even into a USD wallet: converting
+ * it to cents would round to a whole cent and then have Blink price those
+ * cents back into sats at the dealer spread, so a "1000 sats" paywall quoted
+ * the payer ~1007 sats. Blink credits the USD wallet with the equivalent at
+ * creation, so the recipient still receives USD.
+ *
+ * @returns {Promise<{amount: number, unit: 'sats'|'cents'}>}
  */
 export async function computeInvoiceAmount(amount, currency, walletCurrency) {
-    const isSats = currency === 'sats';
+    if (walletCurrency !== 'BTC' && walletCurrency !== 'USD') {
+        throw new Error(`Unsupported wallet currency: ${walletCurrency}`);
+    }
+    if (currency === 'sats') return { amount: Math.round(amount), unit: 'sats' };
+
     if (walletCurrency === 'BTC') {
-        if (isSats) return Math.round(amount);
         const rate = await getRate(currency);
-        return Math.round((amount * 100) / rate.satPrice);
+        return { amount: Math.round((amount * 100) / rate.satPrice), unit: 'sats' };
     }
-    if (walletCurrency === 'USD') {
-        if (currency.toUpperCase() === 'USD') return Math.round(amount * 100);
-        if (isSats) {
-            const rate = await getRate('USD');
-            return Math.round(amount * rate.satPrice);
-        }
-        const rate = await getRate(currency);
-        return Math.round((amount * 100) / rate.usdCentPrice);
+    if (currency.toUpperCase() === 'USD') {
+        return { amount: Math.round(amount * 100), unit: 'cents' };
     }
-    throw new Error(`Unsupported wallet currency: ${walletCurrency}`);
+    const rate = await getRate(currency);
+    return { amount: Math.round((amount * 100) / rate.usdCentPrice), unit: 'cents' };
 }
 
 /**
- * Create an invoice into someone else's wallet (public "on behalf of recipient"
- * mutation). `amount` must already be in wallet units (sats or cents).
+ * The public "on behalf of recipient" mutation for each
+ * (wallet currency, invoice denomination) pair. BTC wallets can only be
+ * invoiced in sats; USD wallets take either.
+ */
+const MUTATIONS = {
+    'BTC:sats': 'lnInvoiceCreateOnBehalfOfRecipient',
+    'USD:cents': 'lnUsdInvoiceCreateOnBehalfOfRecipient',
+    // Sat-denominated, credited to the USD wallet as its value at creation.
+    'USD:sats': 'lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient',
+};
+
+/**
+ * Create an invoice into someone else's wallet. `amount` and `unit` come from
+ * computeInvoiceAmount().
  * @returns {Promise<{paymentRequest: string, paymentHash: string, satoshis: number, expiresAt: number}>}
  */
-export async function createInvoice({ walletId, walletCurrency, amount, memo }) {
-    const isBtc = walletCurrency === 'BTC';
-    const name = isBtc
-        ? 'lnInvoiceCreateOnBehalfOfRecipient'
-        : 'lnUsdInvoiceCreateOnBehalfOfRecipient';
-    const inputType = isBtc
-        ? 'LnInvoiceCreateOnBehalfOfRecipientInput'
-        : 'LnUsdInvoiceCreateOnBehalfOfRecipientInput';
+export async function createInvoice({ walletId, walletCurrency, amount, unit, memo }) {
+    const name = MUTATIONS[`${walletCurrency}:${unit}`];
+    if (!name) {
+        throw new Error(`Cannot invoice a ${walletCurrency} wallet in ${unit}`);
+    }
+    const inputType = name[0].toUpperCase() + name.slice(1) + 'Input';
     const expiryMinutes = EXPIRY_MINUTES[walletCurrency];
 
     const data = await gql(

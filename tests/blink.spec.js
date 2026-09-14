@@ -88,29 +88,47 @@ describe('computeInvoiceAmount', () => {
 
     it('sats -> BTC wallet: passthrough, no fetch', async () => {
         vi.stubGlobal('fetch', vi.fn());
-        expect(await computeInvoiceAmount(2100, 'sats', 'BTC')).toBe(2100);
+        expect(await computeInvoiceAmount(2100, 'sats', 'BTC')).toEqual({
+            amount: 2100,
+            unit: 'sats',
+        });
         expect(fetch).not.toHaveBeenCalled();
     });
 
     it('USD -> USD wallet: cents, no fetch', async () => {
         vi.stubGlobal('fetch', vi.fn());
-        expect(await computeInvoiceAmount(2.5, 'USD', 'USD')).toBe(250);
+        expect(await computeInvoiceAmount(2.5, 'USD', 'USD')).toEqual({
+            amount: 250,
+            unit: 'cents',
+        });
         expect(fetch).not.toHaveBeenCalled();
     });
 
     it('fiat -> BTC wallet: converts via satPrice', async () => {
         stubRate(0.05, 1); // 1 sat = 0.05 cents
-        expect(await computeInvoiceAmount(2.5, 'USD', 'BTC')).toBe(5000);
+        expect(await computeInvoiceAmount(2.5, 'USD', 'BTC')).toEqual({
+            amount: 5000,
+            unit: 'sats',
+        });
     });
 
-    it('sats -> USD wallet: converts via USD satPrice', async () => {
-        stubRate(0.05, 1);
-        expect(await computeInvoiceAmount(5000, 'sats', 'USD')).toBe(250);
+    // Regression: converting a sats price into cents rounded to a whole cent
+    // and then paid the dealer spread, so a 1000 sats paywall quoted ~1007.
+    it('sats -> USD wallet: stays sat-denominated, exact, no rate lookup', async () => {
+        vi.stubGlobal('fetch', vi.fn());
+        expect(await computeInvoiceAmount(1000, 'sats', 'USD')).toEqual({
+            amount: 1000,
+            unit: 'sats',
+        });
+        expect(fetch).not.toHaveBeenCalled();
     });
 
     it('other fiat -> USD wallet: converts via usdCentPrice', async () => {
         stubRate(0.05, 2); // 1 US cent = 2 EUR minor units
-        expect(await computeInvoiceAmount(5, 'EUR', 'USD')).toBe(250);
+        expect(await computeInvoiceAmount(5, 'EUR', 'USD')).toEqual({
+            amount: 250,
+            unit: 'cents',
+        });
     });
 
     it('rejects unknown wallet currency', async () => {
@@ -142,6 +160,7 @@ describe('createInvoice', () => {
             walletId: 'w1',
             walletCurrency: 'BTC',
             amount: 1000,
+            unit: 'sats',
             memo: 'Unlock: X',
         });
         expect(invoice.paymentRequest).toBe('lnbc1...');
@@ -172,12 +191,51 @@ describe('createInvoice', () => {
             walletId: 'w2',
             walletCurrency: 'USD',
             amount: 250,
+            unit: 'cents',
             memo: 'm',
         });
         expect(invoice.paymentRequest).toBe('lnbc2...');
         const body = JSON.parse(fetch.mock.calls[0][1].body);
         expect(body.query).toContain('lnUsdInvoiceCreateOnBehalfOfRecipient');
+        expect(body.query).toContain('$input: LnUsdInvoiceCreateOnBehalfOfRecipientInput!');
         expect(body.variables.input.expiresIn).toBe('5');
+    });
+
+    it('USD wallet + sats: uses the BTC-denominated mutation with the exact sats', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () =>
+                gqlResponse({
+                    lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient: {
+                        invoice: { paymentRequest: 'lnbc3...', paymentHash: 'h3', satoshis: 1000 },
+                        errors: [],
+                    },
+                })
+            )
+        );
+        const invoice = await createInvoice({
+            walletId: 'w2',
+            walletCurrency: 'USD',
+            amount: 1000,
+            unit: 'sats',
+            memo: 'm',
+        });
+        expect(invoice.satoshis).toBe(1000);
+        const body = JSON.parse(fetch.mock.calls[0][1].body);
+        expect(body.query).toContain('lnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipient');
+        expect(body.query).toContain(
+            '$input: LnUsdInvoiceBtcDenominatedCreateOnBehalfOfRecipientInput!'
+        );
+        expect(body.variables.input.amount).toBe('1000'); // exact, not converted
+        expect(body.variables.input.expiresIn).toBe('5');
+    });
+
+    it('rejects a BTC wallet invoiced in cents', async () => {
+        vi.stubGlobal('fetch', vi.fn());
+        await expect(
+            createInvoice({ walletId: 'w1', walletCurrency: 'BTC', amount: 1, unit: 'cents' })
+        ).rejects.toThrow('Cannot invoice a BTC wallet in cents');
+        expect(fetch).not.toHaveBeenCalled();
     });
 
     it('surfaces payload errors', async () => {
@@ -193,7 +251,13 @@ describe('createInvoice', () => {
             )
         );
         await expect(
-            createInvoice({ walletId: 'w1', walletCurrency: 'BTC', amount: 0, memo: '' })
+            createInvoice({
+                walletId: 'w1',
+                walletCurrency: 'BTC',
+                amount: 0,
+                unit: 'sats',
+                memo: '',
+            })
         ).rejects.toThrow('amount too small');
     });
 });

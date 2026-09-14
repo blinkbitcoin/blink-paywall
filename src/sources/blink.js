@@ -11,7 +11,10 @@ import * as blink from '../blink.js';
 import * as lnurl from '../lnurl.js';
 
 export function createBlinkSource(config) {
-    const memo = `Unlock: ${config.title || config.id}`;
+    // Shows in the recipient's Blink transaction list. The prefix is context
+    // for them, so skip it when the title already says "Unlock ...".
+    const label = config.title || config.id;
+    const memo = /^unlock\b/i.test(label) ? label : `Unlock: ${label}`;
 
     return {
         kind: 'blink',
@@ -22,7 +25,7 @@ export function createBlinkSource(config) {
 
             if (!wallet) {
                 // Spark wallets are BTC-only: price must become sats.
-                const sats = await blink.computeInvoiceAmount(
+                const { amount: sats } = await blink.computeInvoiceAmount(
                     config.amount,
                     config.currency,
                     'BTC'
@@ -44,7 +47,7 @@ export function createBlinkSource(config) {
                 };
             }
 
-            const amount = await blink.computeInvoiceAmount(
+            const { amount, unit } = await blink.computeInvoiceAmount(
                 config.amount,
                 config.currency,
                 wallet.currency
@@ -53,6 +56,7 @@ export function createBlinkSource(config) {
                 walletId: wallet.id,
                 walletCurrency: wallet.currency,
                 amount,
+                unit,
                 memo,
             });
             return {
